@@ -2470,9 +2470,18 @@ uint32_t FACTCue_GetState(FACTCue *pCue, uint32_t *pdwState)
 		*pdwState = 0;
 		return 1;
 	}
+#if defined(__GNUC__) || defined(__clang__)
+	/* Terraria branch (after the PortMaster port by wild1walker, MIT): the state is one 32-bit
+	 * value, read atomically instead of under the engine's lock, which the mixer holds while it
+	 * mixes; the game asks a few hundred times a frame. A state the cue had at that moment, as
+	 * the locked read gives one.
+	 */
+	*pdwState = __atomic_load_n(&pCue->state, __ATOMIC_ACQUIRE);
+#else
 	FAudio_PlatformLockMutex(pCue->parentBank->parentEngine->apiLock);
 	*pdwState = pCue->state;
 	FAudio_PlatformUnlockMutex(pCue->parentBank->parentEngine->apiLock);
+#endif
 	return FAUDIO_OK;
 }
 

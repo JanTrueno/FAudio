@@ -306,11 +306,19 @@ uint32_t FAudio_PlatformGetDeviceDetails(
 	/* Get the device format from the OS */
 	if (index == 0)
 	{
-		/* TODO: Do we want to squeeze the name into the output? */
-		if (SDL_GetDefaultAudioInfo(NULL, &spec, 0) < 0)
-		{
-			SDL_zero(spec);
-		}
+		/* SDL_GetDefaultAudioInfo segfaults inside SDL2 on devices whose audio
+		 * backend is half-configured - seen on a Rockchip handheld where PipeWire
+		 * is present but its client.conf is missing, so the default-device query
+		 * walks a broken backend and dies. It is a hard crash inside SDL, not a
+		 * return code, so the error handling below never gets a chance to run.
+		 *
+		 * Taking the zeroed spec here is exactly the path this function already
+		 * follows when the call returns < 0: rate/channels fall through to the
+		 * 48000/2 defaults a few lines down, and SDL resamples to whatever the
+		 * device actually wants. The only thing given up is adopting the device's
+		 * native rate, which is not worth a startup crash.
+		 */
+		SDL_zero(spec);
 	}
 	else
 	{
